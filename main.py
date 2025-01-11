@@ -1,3 +1,7 @@
+"""
+REST API for the smart-meter of my home
+"""
+
 import requests
 import time
 # Define the URL of the REST-API server
