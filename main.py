@@ -7,9 +7,20 @@ from dataclasses import dataclass, field, fields, asdict
 import json
 from datetime import datetime, timezone
 from dateutil import parser
+import time
+from typing import Any
 
 
-#%%
+# %%
+def filter_json_data(json_data: dict, dataclass_type: Any) -> dict:
+    """
+    Filters the input JSON dictionary to include only the fields defined in the dataclass.
+    """
+    dataclass_field_names = {field.name for field in fields(dataclass_type)}
+    return {
+        key: value for key, value in json_data.items() if key in dataclass_field_names
+    }
+
 
 @dataclass
 class Reading:
@@ -21,6 +32,7 @@ class Reading:
     firmware_update_available: bool
     wifi_rssi: int
     mqtt_configured: bool
+    mqtt_server: str  # This is new
     Equipment_Id: str
     GasEquipment_Id: str
     ElectricityTariff: float
@@ -50,13 +62,16 @@ class Reading:
     GasDeliveredHour: float
     PowerDeliveredHour: float
     PowerDeliveredNetto: float
-    time_stamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc).replace(microsecond=0))
+    time_stamp: datetime = field(
+        default_factory=lambda: datetime.now(timezone.utc).replace(microsecond=0)
+    )
+
     def __post_init__(self):
         # Type conversion map for easier management
         type_conversion = {
             float: float,
             int: int,
-            bool: lambda x: x.lower() == 'true',
+            bool: lambda x: x.lower() == "true",
             datetime: lambda x: parser.parse(x) if isinstance(x, str) else x,
         }
 
@@ -70,50 +85,51 @@ class Reading:
                     converter = type_conversion.get(field_type)
                     setattr(self, field.name, converter(value))
                 except Exception as e:
-                    raise ValueError(f"Error converting field '{field.name}' with value '{value}' to {field_type}: {e}")
+                    raise ValueError(
+                        f"Error converting field '{field.name}' with value '{value}' to {field_type}: {e}"
+                    )
+
     def __repr__(self):
         return json.dumps(asdict(self), indent=4, default=str)
 
-#%%
+
+# %%
 
 # Define the URL of the REST-API server
 url = "http://192.168.2.11:82/smartmeter/api/read"
 
 
-#%%
+# %%
 response = requests.get(url)
 if response.status_code == 200:
-    # Parse the response as JSON
     json_data = response.json()
-    # print("Successfully retrieved data:")
-    # print(json_data)
-    print(json.dumps(json_data, indent=4))
+    filtered_data = filter_json_data(json_data, Reading)  # Filter out unwanted keys
+    reading_instance = Reading(**filtered_data)
+    print(reading_instance)
 else:
     print(f"Failed to retrieve data. Status code: {response.status_code}")
 
+# %%
 
-#%%
+aa = Reading(**json_data)
 
-#
-#
-# #%%
-# while True:
-#     try:
-#         # Send a GET request to the server
-#         response = requests.get(url)
-#
-#         # Check if the request was successful (status code 200)
-#         if response.status_code == 200:
-#             # Parse the response as JSON
-#             json_data = response.json()
-#             # print("Successfully retrieved data:")
-#             # print(json_data)
-#         else:
-#             print(f"Failed to retrieve data. Status code: {response.status_code}")
-#
-#     except requests.exceptions.RequestException as e:
-#         print(f"An error occurred: {e}")
-#
-#
-#     print(f"Power: {float(json_data['PowerDelivered_total']):.3f}")
-#     time.sleep(3)
+# %%
+while True:
+    try:
+        # Send a GET request to the server
+        response = requests.get(url)
+
+        # Check if the request was successful (status code 200)
+        if response.status_code == 200:
+            # Parse the response as JSON
+            json_data = response.json()
+            # print("Successfully retrieved data:")
+            # print(json_data)
+        else:
+            print(f"Failed to retrieve data. Status code: {response.status_code}")
+
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred: {e}")
+
+    print(f"Power: {float(json_data['PowerDelivered_total']):.3f}")
+    time.sleep(3)
