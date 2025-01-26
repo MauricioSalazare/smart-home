@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from dataclasses import dataclass, fields, asdict
+from dataclasses import dataclass, fields, field, asdict
 import json
 from dateutil import parser
 
