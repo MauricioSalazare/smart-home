@@ -3,9 +3,11 @@ from dataclasses import dataclass, fields, asdict
 import json
 from dateutil import parser
 
+
 @dataclass
 class Message:
     """Dataclass to represent the relevant smart meter data from the MQTT broker"""
+
     timestamp_utc: datetime = None
     electricity_delivered_1: float = None
     electricity_delivered_2: float = None
@@ -35,6 +37,7 @@ class Message:
 @dataclass
 class Reading:
     """Dataclass that represent the full data reading from the smart meter using REST-API interface"""
+
     mac_address: str
     gateway_model: str
     startup_time: datetime

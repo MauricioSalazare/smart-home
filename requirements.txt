@@ -1,6 +1,6 @@
 paho-mqtt
 requests
 python-dateutil
-psycopg[binary,pool]
+psycopg[binary, pool]
 python-dotenv
 black

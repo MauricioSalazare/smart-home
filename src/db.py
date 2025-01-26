@@ -1,4 +1,3 @@
-
 from psycopg import connect
 from psycopg.rows import dict_row
 from dataclasses import asdict, fields
@@ -18,6 +17,7 @@ DB_PASSWORD = os.getenv("DB_PASSWD")
 DB_HOST = os.getenv("DB_HOST")
 DB_PORT = os.getenv("DB_PORT")
 DB_TABLE = os.getenv("DB_TABLE")
+
 
 class DBConnection:
     def __init__(
@@ -41,12 +41,12 @@ class DBConnection:
         query = "SELECT extname FROM pg_extension WHERE extname = 'timescaledb';"
         try:
             with connect(
-                    dbname=self.dbname,
-                    user=self.user,
-                    password=self.password,
-                    host=self.host,
-                    port=self.port,
-                    row_factory=dict_row,
+                dbname=self.dbname,
+                user=self.user,
+                password=self.password,
+                host=self.host,
+                port=self.port,
+                row_factory=dict_row,
             ) as conn:
                 with conn.cursor() as cursor:
                     cursor.execute(query)
@@ -68,12 +68,12 @@ class DBConnection:
         """
         try:
             with connect(
-                    dbname=self.dbname,
-                    user=self.user,
-                    password=self.password,
-                    host=self.host,
-                    port=self.port,
-                    row_factory=dict_row,
+                dbname=self.dbname,
+                user=self.user,
+                password=self.password,
+                host=self.host,
+                port=self.port,
+                row_factory=dict_row,
             ) as conn:
                 with conn.cursor() as cursor:
                     cursor.execute(query, (self.table,))
@@ -88,10 +88,12 @@ class DBConnection:
                 return field.name
         raise ValueError("No datetime field found in the Message dataclass.")
 
-    def create_hypertable(self,
-                          message_cls: Type[Message],
-                          chunk_interval: str = "7 days",
-                          index_columns: Optional[list]=None):
+    def create_hypertable(
+        self,
+        message_cls: Type[Message],
+        chunk_interval: str = "7 days",
+        index_columns: Optional[list] = None,
+    ):
         """Create the table and convert it to a hypertable."""
         time_column = self._get_datetime_field(message_cls)
 
@@ -99,8 +101,11 @@ class DBConnection:
             print(f"Table '{self.table}' does not exist. Creating...")
             # Dynamically generate table schema from the Message class
             columns = [
-                f"{field.name} TIMESTAMPTZ NOT NULL" if field.type is datetime
-                else f"{field.name} DOUBLE PRECISION"
+                (
+                    f"{field.name} TIMESTAMPTZ NOT NULL"
+                    if field.type is datetime
+                    else f"{field.name} DOUBLE PRECISION"
+                )
                 for field in fields(message_cls)
             ]
             columns = ", ".join(columns)
@@ -112,11 +117,11 @@ class DBConnection:
             """
             try:
                 with connect(
-                        dbname=self.dbname,
-                        user=self.user,
-                        password=self.password,
-                        host=self.host,
-                        port=self.port,
+                    dbname=self.dbname,
+                    user=self.user,
+                    password=self.password,
+                    host=self.host,
+                    port=self.port,
                 ) as conn:
                     with conn.cursor() as cursor:
                         # Create the table
@@ -129,7 +134,8 @@ class DBConnection:
                                          """
                         cursor.execute(hypertable_query)
                         print(
-                            f"Table '{self.table}' converted to a hypertable with a chunk interval of {chunk_interval}.")
+                            f"Table '{self.table}' converted to a hypertable with a chunk interval of {chunk_interval}."
+                        )
 
                         if index_columns:
                             for column in index_columns:
@@ -165,6 +171,7 @@ class DBConnection:
                     print(f"Message saved to table '{self.table}': {message}")
         except Exception as e:
             raise RuntimeError(f"Failed to save message: {e}")
+
 
 if __name__ == "__main__":
     db = DBConnection(

@@ -1,6 +1,4 @@
 import paho.mqtt.client as mqtt
-import psycopg
-from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 from threading import Timer
 from dotenv import load_dotenv
@@ -8,6 +6,7 @@ import os
 from typing import Optional
 from src.mssg import Message
 from src.db import DBConnection
+
 # Load environment variables from the .env file
 
 load_dotenv()
@@ -29,8 +28,9 @@ DB_CONFIG = {
     "password": os.getenv("DB_PASSWD"),
     "host": os.getenv("DB_HOST"),
     "port": os.getenv("DB_PORT"),
-    "table": os.getenv("DB_TABLE")
+    "table": os.getenv("DB_TABLE"),
 }
+
 
 class MQTTHandler:
     """Handles MQTT subscriptions and stores specific data into a database."""
@@ -41,7 +41,7 @@ class MQTTHandler:
         port: int,
         username: str,
         password: str,
-        topics: list|str,
+        topics: list | str,
         db_handler: Optional[DBConnection] = None,
         timeout: int = 7,  # seconds
     ):
@@ -51,8 +51,9 @@ class MQTTHandler:
         # Check TimescaleDB extension is installed
         self.db_handler.check_timescaledb()
         # Check if the table exist. Otherwise, create the TimescaleDB hypertable.
-        self.db_handler.create_hypertable(Message, index_columns=["electricity_currently_delivered"])
-
+        self.db_handler.create_hypertable(
+            Message, index_columns=["electricity_currently_delivered"]
+        )
 
         # MQTT credentials
         self.broker = broker
@@ -66,7 +67,9 @@ class MQTTHandler:
         self.root_topics = topics
         self.timeout = timeout
 
-        self.current_message: Message = Message() # Single instance of Message to track subtopics
+        self.current_message: Message = (
+            Message()
+        )  # Single instance of Message to track subtopics
 
         self.timer = None
         self.mqtt_client = mqtt.Client()

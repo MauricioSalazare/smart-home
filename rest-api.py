@@ -1,6 +1,7 @@
 """
 REST API example for the smart-meter
 """
+
 import requests
 from dataclasses import fields
 import time
@@ -16,6 +17,7 @@ def filter_json_data(json_data: dict, dataclass_type: Type[Reading]) -> dict:
     return {
         key: value for key, value in json_data.items() if key in dataclass_field_names
     }
+
 
 if __name__ == "__main__":
     # Define the URL of the REST-API server
