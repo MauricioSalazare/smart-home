@@ -1,6 +1,6 @@
 import paho.mqtt.client as mqtt
 from datetime import datetime, timezone
-from threading import Timer
+from threading import Timer, Event
 from dotenv import load_dotenv
 import os
 from typing import Optional
@@ -73,6 +73,7 @@ class MQTTHandler:
 
         self.timer = None
         self.mqtt_client = mqtt.Client()
+        self.stop_event = Event()
         self.setup_mqtt_client()
 
     def setup_mqtt_client(self):
@@ -92,6 +93,19 @@ class MQTTHandler:
 
         else:
             print(f"Failed to connect, return code {rc}")
+
+    def on_disconnect(self, client, userdata, rc):
+        """Callback when the MQTT client is disconnected."""
+        if rc != 0:
+            print("Unexpected disconnection. Reconnecting...")
+        while not self.stop_event.is_set():
+            try:
+                self.mqtt_client.reconnect()
+                print("Reconnected to broker.")
+                break
+            except Exception as e:
+                print(f"Reconnection failed: {e}. Retrying in 5 seconds...")
+                self.stop_event.wait(5)
 
     def on_message(self, client, userdata, msg):
         """Callback when a message is received."""
@@ -154,8 +168,13 @@ class MQTTHandler:
 
     def start(self):
         """Starts the MQTT client loop."""
-        self.mqtt_client.connect(self.broker, self.port, 60)
-        self.mqtt_client.loop_forever()
+        try:
+            self.mqtt_client.connect(self.broker, self.port, keepalive=60)
+            self.mqtt_client.loop_forever()
+        except KeyboardInterrupt:
+            print("Gracefully stopping MQTT handler...")
+            self.stop_event.set()
+            self.mqtt_client.disconnect()
 
 
 # Main execution
