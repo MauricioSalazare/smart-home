@@ -86,10 +86,14 @@ class MQTTHandler:
         """Callback when the MQTT client connects to the broker."""
         if rc == 0:
             print("Connected to broker!")
+            print(f"Connected to {self.broker}:{self.port} as {self.username}")
 
             for topic, qos in self.root_topics:
-                client.subscribe(topic, qos)
-                print(f"Subscribed to topic: {topic}")
+                if topic:
+                    client.subscribe(topic, qos)
+                    print(f"Subscribed to topic: {topic} with qos: {qos}")
+                else:
+                    print("Warning: Empty topic detected. Check .env file!")
 
         else:
             print(f"Failed to connect, return code {rc}")
@@ -100,9 +104,10 @@ class MQTTHandler:
             print("Unexpected disconnection. Reconnecting...")
         while not self.stop_event.is_set():
             try:
+                print("Attempting to reconnect...")
                 self.mqtt_client.reconnect()
-                print("Reconnected to broker.")
-                break
+                print("Reconnected successfully!")
+                return
             except Exception as e:
                 print(f"Reconnection failed: {e}. Retrying in 5 seconds...")
                 self.stop_event.wait(5)
@@ -170,6 +175,7 @@ class MQTTHandler:
         """Starts the MQTT client loop."""
         try:
             self.mqtt_client.connect(self.broker, self.port, keepalive=60)
+            print("MQTT client started. Listening for messages...")
             self.mqtt_client.loop_forever()
         except KeyboardInterrupt:
             print("Gracefully stopping MQTT handler...")
