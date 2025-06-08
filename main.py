@@ -81,6 +81,7 @@ class MQTTHandler:
         self.mqtt_client.username_pw_set(self.username, self.password)
         self.mqtt_client.on_connect = self.on_connect
         self.mqtt_client.on_message = self.on_message
+        self.mqtt_client.on_disconnect = self.on_disconnect
 
     def on_connect(self, client, userdata, flags, rc):
         """Callback when the MQTT client connects to the broker."""
@@ -100,13 +101,15 @@ class MQTTHandler:
 
     def on_disconnect(self, client, userdata, rc):
         """Callback when the MQTT client is disconnected."""
+        print(f"Disconnected from broker with code {rc}")
+
         if rc != 0:
             print("Unexpected disconnection. Reconnecting...")
         while not self.stop_event.is_set():
             try:
                 print("Attempting to reconnect...")
                 self.mqtt_client.reconnect()
-                print("Reconnected successfully!")
+                print("Reconnected successfully! Exiting on_disconnect().")
                 return
             except Exception as e:
                 print(f"Reconnection failed: {e}. Retrying in 5 seconds...")
@@ -114,6 +117,7 @@ class MQTTHandler:
 
     def on_message(self, client, userdata, msg):
         """Callback when a message is received."""
+        print(f"Received message on topic: {msg.topic} with payload: {msg.payload.decode()}")
 
         subtopic = None
         for root_topic, _ in self.root_topics:
