@@ -1,12 +1,17 @@
 import paho.mqtt.client as mqtt
 from datetime import datetime, timezone
 from threading import Timer, Event
+import threading
 from dotenv import load_dotenv
 import os
 from typing import Optional
 from src.mssg import Message
 from src.db import DBConnection
+from src.logger import setup_logger
 
+
+
+logger = setup_logger(__name__)
 # Load environment variables from the .env file
 
 load_dotenv()
@@ -73,6 +78,7 @@ class MQTTHandler:
 
         self.timer = None
         self.mqtt_client = mqtt.Client()
+        self.mqtt_client.will_set("clients/python_status", payload="disconnected", qos=1, retain=True)
         self.stop_event = Event()
         self.setup_mqtt_client()
 
@@ -88,13 +94,16 @@ class MQTTHandler:
         if rc == 0:
             print("Connected to broker!")
             print(f"Connected to {self.broker}:{self.port} as {self.username}")
+            logger.info(f"Connected to {self.broker}:{self.port} as {self.username}")
 
             for topic, qos in self.root_topics:
                 if topic:
                     client.subscribe(topic, qos)
                     print(f"Subscribed to topic: {topic} with qos: {qos}")
+                    logger.info(f"Subscribed to topic: {topic} with qos: {qos}")
                 else:
                     print("Warning: Empty topic detected. Check .env file!")
+                    logger.warning("Warning: Empty topic detected. Check .env file!")
 
         else:
             print(f"Failed to connect, return code {rc}")
@@ -102,58 +111,69 @@ class MQTTHandler:
     def on_disconnect(self, client, userdata, rc):
         """Callback when the MQTT client is disconnected."""
         print(f"Disconnected from broker with code {rc}")
+        logger.info(f"Disconnected from broker with code {rc}")
 
-        if rc != 0:
-            print("Unexpected disconnection. Reconnecting...")
+        # if rc != 0:
+        #     print("Unexpected disconnection. Reconnecting...")
         while not self.stop_event.is_set():
             try:
                 print("Attempting to reconnect...")
+                logger.info(f"Attempting to reconnect...")
                 self.mqtt_client.reconnect()
+                logger.info("Reconnected successfully! Exiting on_disconnect().")
                 print("Reconnected successfully! Exiting on_disconnect().")
                 return
             except Exception as e:
+                logger.info(f"Reconnection failed: {e}. Retrying in 5 seconds...")
                 print(f"Reconnection failed: {e}. Retrying in 5 seconds...")
                 self.stop_event.wait(5)
 
     def on_message(self, client, userdata, msg):
         """Callback when a message is received."""
-        print(f"Received message on topic: {msg.topic} with payload: {msg.payload.decode()}")
 
-        subtopic = None
-        for root_topic, _ in self.root_topics:
-            clean_topic = root_topic.replace("#", "")  # Remove wildcard
-            if msg.topic.startswith(clean_topic):
-                subtopic = msg.topic.replace(clean_topic, "")
-                break
+        try:
 
-        if subtopic is None:
-            print(f"Received message from unknown topic: {msg.topic}")
-            return
+            print(f"Received message on topic: {msg.topic} with payload: {msg.payload.decode()}")
 
-        payload = msg.payload.decode()
+            subtopic = None
+            for root_topic, _ in self.root_topics:
+                clean_topic = root_topic.replace("#", "")  # Remove wildcard
+                if msg.topic.startswith(clean_topic):
+                    subtopic = msg.topic.replace(clean_topic, "")
+                    break
 
-        # Update the corresponding field in the current message
-        if hasattr(self.current_message, subtopic):
-            setattr(self.current_message, subtopic, payload)
-            print(f"Updated field: {subtopic} -> {payload}")
+            if subtopic is None:
+                print(f"Received message from unknown topic: {msg.topic}")
+                return
 
-        # Reset the timeout RRtimer
-        if self.timer:
-            self.timer.cancel()
-        self.timer = Timer(self.timeout, self.handle_timeout)
-        self.timer.start()
+            payload = msg.payload.decode()
 
-        # Check if the message is complete and save it to the database
-        if self.current_message.is_complete():
-            self.current_message.timestamp_utc = datetime.now(timezone.utc).replace(
-                microsecond=0
-            )
-            if self.db_handler is not None:
-                self.db_handler.save_message(self.current_message)
-                print(f"Saved complete message: {self.current_message}")
-            else:
-                print(f"Complete message: {self.current_message}")
-            self.reset_message()
+            # Update the corresponding field in the current message
+            if hasattr(self.current_message, subtopic):
+                setattr(self.current_message, subtopic, payload)
+                print(f"Updated field: {subtopic} -> {payload}")
+
+            # Reset the timeout RRtimer
+            if self.timer:
+                self.timer.cancel()
+            self.timer = Timer(self.timeout, self.handle_timeout)
+            self.timer.start()
+
+            # Check if the message is complete and save it to the database
+            if self.current_message.is_complete():
+                self.current_message.timestamp_utc = datetime.now(timezone.utc).replace(
+                    microsecond=0
+                )
+                if self.db_handler is not None:
+                    self.db_handler.save_message(self.current_message)
+                    print(f"Saved complete message: {self.current_message}")
+                else:
+                    print(f"Complete message: {self.current_message}")
+                self.reset_message()
+
+        except Exception as e:
+            logger.error(f"Error while handling message: {e}")
+            print(f"Error processing message: {e}")
 
     def handle_timeout(self):
         """Handle timeout for incomplete messages."""
@@ -178,14 +198,29 @@ class MQTTHandler:
     def start(self):
         """Starts the MQTT client loop."""
         try:
+            # Start heartbeat in a background thread
+            self.heartbeat_thread = threading.Thread(target=self.publish_heartbeat, daemon=True)
+            self.heartbeat_thread.start()
+
             self.mqtt_client.connect(self.broker, self.port, keepalive=60)
             print("MQTT client started. Listening for messages...")
+            logger.info("MQTT client started. Listening for messages...")
             self.mqtt_client.loop_forever()
         except KeyboardInterrupt:
             print("Gracefully stopping MQTT handler...")
+            logger.info("Gracefully stopping MQTT handler...")
             self.stop_event.set()
             self.mqtt_client.disconnect()
 
+
+    def publish_heartbeat(self):
+        while not self.stop_event.is_set():
+            try:
+                self.mqtt_client.publish("clients/python_status", "alive", qos=1, retain=True)
+                print("[HEARTBEAT] Published alive message")
+            except Exception as e:
+                print(f"[HEARTBEAT ERROR] {e}")
+            self.stop_event.wait(300)  # every 5 minutes
 
 # Main execution
 if __name__ == "__main__":

@@ -8,7 +8,7 @@
 #  --nuc-user nucadmin
 
 
-# Default values
+# Default values the VERSION is controlled by the args parameters (SEE EXAMPLE TO RUN, UP)
 IMAGE_NAME="smart-meter-mqtt"
 VERSION="v1.0.0"
 
