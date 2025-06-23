@@ -36,6 +36,15 @@ If you want to test the 'production' image. Run it locally using
 docker run -d --env-file .env --network=host -p 1883:1883 --name smart-meter-mqtt smart-meter-mqtt:v1.0.0
 ```
 
+## Retrieve mosquitto logs
+In case of disconnect to read the logs in the mosquitto broker:
+```shell
+sudo journalctl -u mosquitto.service --since "2025-06-22 13:00" | less
+```
+or 
+```shell
+sudo journalctl -u mosquitto.service --since "2025-06-22 13:00" --until "2025-06-23 10:00"
+```
 
 
 
