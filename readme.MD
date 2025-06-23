@@ -20,6 +20,18 @@ Run the container de-attached with the local `.env` variables lie
 docker run -d --env-file .env --name smart-meter smart-meter-mqtt
 ```
 
+## Subscribe your local repository 
+Authenticate to `ghcr.io` in you development system as
+
+```shell
+echo "<YOUR_GITHUB_PAT>" | docker login ghcr.io -u <YOUR_GITHUB_USERNAME> --password-stdin
+```
+`<YOUR_GITHUB_USERNAME>` with your GitHub username
+`<YOUR_GITHUB_PAT>` with your **GitHub PErsonal Access Token (PAT)** that has at leas the scope to `write:packages`, 
+`read:packages`, and optional `delte:packages`.
+
+
+
 ## Ready to deploy
 Build the image for linux using the bash script like this
 ```shell
